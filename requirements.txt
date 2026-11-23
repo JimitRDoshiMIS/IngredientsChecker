@@ -1,0 +1,11 @@
+# CPU-only PyTorch wheels (the default Linux wheel pulls ~2.5 GB of CUDA
+# libraries, which is wasteful on Streamlit Community Cloud).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+torchvision>=0.17
+
+streamlit>=1.40
+easyocr>=1.7.2
+Pillow>=10.0
+numpy>=1.26
+deep-translator>=1.11
