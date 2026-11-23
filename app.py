@@ -22,6 +22,7 @@ from ocr import (
     prepare_image,
     results_to_text,
     run_ocr,
+    split_all_text,
     validate_languages,
 )
 from translate import (
@@ -247,8 +248,20 @@ if avg_conf < 0.7:
     )
 
 ingredients = extract_ingredients(text)
+header_found = bool(ingredients)
+if not ingredients:
+    # No "Ingredients:" header was read — still run the checks over everything
+    # that was detected so the verdict is never silently skipped.
+    ingredients = split_all_text(text)
 if ingredients:
-    st.subheader(f"🧾 Ingredients ({len(ingredients)})")
+    if header_found:
+        st.subheader(f"🧾 Ingredients ({len(ingredients)})")
+    else:
+        st.subheader("🧾 Detected items")
+        st.warning(
+            "Couldn't find an **Ingredients:** / **Thành phần:** header in the scan, so every "
+            "detected phrase was checked instead. Re-shoot with the header in frame for a cleaner list."
+        )
 
     english: list[str] | None = None
     source_lang = pick_source_language(languages)

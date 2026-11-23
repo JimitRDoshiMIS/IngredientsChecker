@@ -278,6 +278,18 @@ def extract_ingredients(text: str) -> list[str]:
     return items
 
 
+def split_all_text(text: str) -> list[str]:
+    """Fallback when no ingredient list is found: split every OCR line on
+    top-level commas/semicolons so the diet checks can still run over all text."""
+    items: list[str] = []
+    for line in text.splitlines():
+        for item in _split_top_level(line):
+            item = item.strip(" .:;-–")
+            if len(item) > 1:
+                items.append(item)
+    return items
+
+
 def run_ocr(
     reader,
     image: Image.Image,

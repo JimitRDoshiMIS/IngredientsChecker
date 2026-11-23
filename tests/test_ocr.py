@@ -9,6 +9,7 @@ from ocr import (
     parse_raw_results,
     prepare_image,
     results_to_text,
+    split_all_text,
     validate_languages,
 )
 
@@ -66,6 +67,12 @@ def test_extract_ingredients_bilingual_header_chain():
 def test_extract_ingredients_without_header_needs_comma_list():
     assert extract_ingredients("Hello world") == []
     assert extract_ingredients("Sugar, salt, water, flour") == ["Sugar", "salt", "water", "flour"]
+
+
+def test_split_all_text_fallback_splits_lines_and_commas():
+    text = "Potato (60%), onion powder\nSalt.\nStore in a cool, dry place"
+    assert split_all_text(text) == ["Potato (60%)", "onion powder", "Salt", "Store in a cool", "dry place"]
+    assert split_all_text("") == []
 
 
 def test_parse_raw_results_filters_blank_and_low_confidence():
