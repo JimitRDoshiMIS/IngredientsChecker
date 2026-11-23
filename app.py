@@ -12,7 +12,7 @@ import streamlit as st
 from PIL import Image, UnidentifiedImageError
 from streamlit.errors import StreamlitSecretNotFoundError
 
-from diet import classify_ingredients, overall_status
+from diet import classify_ingredients, classify_jain_all, overall_jain, overall_status
 from ocr import (
     DEFAULT_LANGUAGES,
     SUPPORTED_LANGUAGES,
@@ -273,41 +273,84 @@ if ingredients:
 
     checks = classify_ingredients(ingredients, english)
     verdict = overall_status(checks)
-    flagged = [(orig, en, c) for orig, en, c in zip(ingredients, english or ingredients, checks) if c.status != "veg"]
+    jain_checks = classify_jain_all(ingredients, english, checks)
+    jain_verdict = overall_jain(jain_checks)
+    shown = english or ingredients
+
+    def names(selected_checks, want_status):
+        return ", ".join(f"**{name}**" for name, c in zip(shown, selected_checks) if c.status == want_status)
 
     if verdict == "non_veg":
-        names = ", ".join(f"**{en or orig}**" for orig, en, c in flagged if c.status == "non_veg")
-        st.error(f"🔴 **NON-VEGETARIAN** — contains: {names}")
-    elif verdict == "uncertain":
-        names = ", ".join(f"**{en or orig}**" for orig, en, _ in flagged)
-        st.warning(f"🟠 **Probably vegetarian** — but these additives can be animal-derived: {names}")
+        headline = "🔴 Non-vegetarian"
+    elif jain_verdict == "jain":
+        headline = "🟢 Vegetarian **and** Jain-friendly"
+    elif jain_verdict == "not_jain":
+        headline = "🟢 Vegetarian — 🚫 but **not** Jain-friendly (veg only)"
     else:
-        st.success("🟢 **100% VEGETARIAN** — no meat, fish, seafood or egg ingredients found")
+        headline = "🟢 Vegetarian — ❔ Jain suitability uncertain"
+    if verdict == "uncertain" and jain_verdict != "not_jain":
+        headline = headline.replace("🟢 Vegetarian", "🟠 Probably vegetarian")
+    st.markdown(f"### {headline}")
 
-    def item_line(i: int, orig: str, en: str | None, check) -> str:
+    veg_col, jain_col = st.columns(2)
+    with veg_col:
+        if verdict == "non_veg":
+            st.error(f"🔴 **NON-VEGETARIAN**\n\nContains: {names(checks, 'non_veg')}")
+        elif verdict == "uncertain":
+            st.warning(f"🟠 **Probably vegetarian**\n\nMay be animal-derived: {names(checks, 'uncertain')}")
+        else:
+            st.success("🟢 **VEGETARIAN**\n\nNo meat, fish, seafood or egg found")
+    with jain_col:
+        if jain_verdict == "not_jain":
+            reasons = names(jain_checks, "not_jain") if verdict != "non_veg" else "non-vegetarian ingredients"
+            st.error(f"🚫 **NOT JAIN**\n\nContains: {reasons}")
+        elif jain_verdict == "uncertain":
+            st.warning(f"❔ **JAIN: UNCERTAIN**\n\nVaries by household: {names(jain_checks, 'uncertain')}")
+        else:
+            st.success("🙏 **JAIN-FRIENDLY**\n\nNo root vegetables, honey, alcohol, fungi or figs")
+
+    def item_line(i: int, orig: str, en: str | None, check, jain_check) -> str:
         main = f"**{en}** <span style=\"color:gray\">· {orig}</span>" if en else orig
         note = f" <span style=\"color:#c62828\">({', '.join(check.matches)})</span>" if check.matches else ""
+        # Only add a Jain tag for Jain-specific reasons; non-veg items are already red.
+        if check.status == "veg" and jain_check.status == "not_jain":
+            note += f" <span style=\"color:#6d4c41\">🚫 Jain: {', '.join(jain_check.matches)}</span>"
+        elif check.status != "non_veg" and jain_check.status == "uncertain":
+            jain_only = [m for m in jain_check.matches if m not in check.matches]
+            if jain_only:
+                note += f" <span style=\"color:#b26a00\">❔ Jain: {', '.join(jain_only)}</span>"
         return f"{i}. {check.emoji} {main}{note}"
 
     st.markdown(
         "\n".join(
-            item_line(i, orig, en, check)
-            for i, (orig, en, check) in enumerate(zip(ingredients, english or [None] * len(ingredients), checks), 1)
+            item_line(i, orig, en, check, jain_check)
+            for i, (orig, en, check, jain_check) in enumerate(
+                zip(ingredients, english or [None] * len(ingredients), checks, jain_checks), 1
+            )
         ),
         unsafe_allow_html=True,
     )
-    st.caption("🟢 vegetarian · 🟠 uncertain (additive that may be animal-derived) · 🔴 non-vegetarian (egg counts as non-veg)")
+    st.caption(
+        "🟢 vegetarian · 🟠 uncertain (additive that may be animal-derived) · 🔴 non-vegetarian (egg counts as non-veg) · "
+        "🚫 Jain: root vegetable / honey / alcohol / fungus / fig · ❔ Jain: avoidance varies by household"
+    )
+
+    def csv_rows(name_cols):
+        return "\n".join(
+            ",".join(name_cols(orig, en))
+            + f",{check.label},{csv_escape('; '.join(check.matches))}"
+            + f",{jain_check.label},{csv_escape('; '.join(jain_check.matches))}"
+            for orig, en, check, jain_check in zip(ingredients, english or [None] * len(ingredients), checks, jain_checks)
+        )
 
     if english:
         st.code("\n".join(english), language=None)
-        csv_data = "ingredient_english,ingredient_original,diet,flagged_terms\n" + "\n".join(
-            f"{csv_escape(en)},{csv_escape(orig)},{check.label},{csv_escape('; '.join(check.matches))}"
-            for orig, en, check in zip(ingredients, english, checks)
+        csv_data = "ingredient_english,ingredient_original,diet,flagged_terms,jain,jain_flagged_terms\n" + csv_rows(
+            lambda orig, en: (csv_escape(en), csv_escape(orig))
         )
     else:
-        csv_data = "ingredient,diet,flagged_terms\n" + "\n".join(
-            f"{csv_escape(item)},{check.label},{csv_escape('; '.join(check.matches))}"
-            for item, check in zip(ingredients, checks)
+        csv_data = "ingredient,diet,flagged_terms,jain,jain_flagged_terms\n" + csv_rows(
+            lambda orig, en: (csv_escape(orig),)
         )
 
     st.download_button(

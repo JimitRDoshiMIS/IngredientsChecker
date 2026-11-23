@@ -33,6 +33,15 @@ install needed.
   are only *sometimes* animal-derived (E471, glycerin, rennet, …) are amber so
   the red verdict stays reliable. The `.csv` includes `diet` and `flagged_terms`
   columns
+- **Jain check** (second badge next to the vegetarian one): flags anything that
+  grows underground (onion, garlic, shallot, leek, chives, potato, carrot,
+  beetroot, radish, turnip, yam, taro, lotus root, galangal, liquorice root…),
+  **honey**, **alcohol**, **fungi/mushrooms** and **figs**, in English and
+  Vietnamese. Items whose avoidance varies between households (yeast, vinegar
+  and fermented foods, ginger/turmeric, tapioca/cassava, eggplant, asafoetida,
+  chicory inulin, sprouts) show as ❔ uncertain. The headline tells you at a
+  glance whether a product is *"Vegetarian and Jain-friendly"* or *"Vegetarian —
+  but not Jain-friendly (veg only)"*. CSV gains `jain` and `jain_flagged_terms`
 - Detected text regions drawn on the image
 - Full text assembled in reading order, with one-tap copy and `.txt` download
 - Manual 0/90/180/270° rotation plus optional auto-rotation detection
@@ -120,18 +129,20 @@ there; the **Auto** translation setting falls back to MyMemory automatically.
 | `app.py` | Streamlit UI (camera / upload, settings, ingredient list, full text) |
 | `ocr.py` | OCR helpers: label enhancement, EasyOCR wrapper, reading-order text assembly, ingredient parser, language validation |
 | `translate.py` | Ingredient translation to English via `deep-translator` (Google → MyMemory fallback, context-preserving chunking) |
-| `diet.py` | Vegetarian / non-vegetarian classifier (EN + VI term lists, egg = non-veg, uncertain additives) |
+| `diet.py` | Vegetarian / non-vegetarian classifier (EN + VI term lists, egg = non-veg, uncertain additives) and Jain classifier (root vegetables, honey, alcohol, fungi, figs) |
 | `.streamlit/config.toml` | Server binds to `0.0.0.0` so phones can connect; theme |
 | `.streamlit/secrets.example.toml` | Template for the optional `APP_PASSWORD` login |
 | `tests/test_ocr.py` | Unit tests for the pure OCR helpers |
 | `tests/test_translate.py` | Unit tests for translation chunking and backend fallback (no network) |
 | `tests/test_diet.py` | Unit tests for the vegetarian classifier (egg, accent-sensitive Vietnamese, E-numbers, false-positive guards) |
 
-> **Disclaimer:** the vegetarian check is keyword-based and only as good as the
-> OCR, the translation and the term lists in `diet.py`. Treat a green result as
-> "nothing suspicious found", not as certification — always double-check the
-> physical label for allergies or strict dietary needs. Add terms to the lists
-> in `diet.py` to extend coverage.
+> **Disclaimer:** the vegetarian and Jain checks are keyword-based and only as
+> good as the OCR, the translation and the term lists in `diet.py`. Treat a
+> green result as "nothing suspicious found", not as certification — always
+> double-check the physical label for allergies or strict dietary needs. Jain
+> practice differs between traditions and families; the "uncertain" tier marks
+> the common points of divergence. Add terms to the lists in `diet.py` to extend
+> coverage.
 
 ## Notes on translation
 

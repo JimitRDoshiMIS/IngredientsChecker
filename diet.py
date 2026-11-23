@@ -33,7 +33,7 @@ NON_VEG_EN: tuple[tuple[str, str], ...] = (
     (r"\b(tallow|suet|dripping|schmaltz)\b", "animal fat"),
     (r"\b(fish|anchov(y|ies)|sardines?|tuna|salmon|cod|mackerel|herring|tilapia|catfish|pollock)\b", "fish"),
     (r"\b(fish|anchovy|oyster|shrimp|prawn|crab) ?(sauce|paste|extract|powder|oil|stock)\b", "seafood"),
-    (r"\b(shrimps?|prawns?|crabs?|lobsters?|squid|cuttlefish|octopus|clams?|mussels?|scallops?|oysters?)\b", "seafood"),
+    (r"\b(shrimps?|prawns?|crabs?|lobsters?|squid|cuttlefish|octopus|clams?|mussels?|scallops?|oysters?(?! mushrooms?))\b", "seafood"),
     (r"\b(seafood|shellfish|krill|roe|caviar|bonito|katsuobushi|dashi|surimi)\b", "seafood"),
     (r"\b(gelatine?|isinglass|collagen)\b", "gelatin"),
     (r"\b(carmine|cochineal|carminic acid)\b", "carmine (insect dye)"),
@@ -148,3 +148,112 @@ def overall_status(checks: Iterable[DietCheck]) -> Status:
     if "uncertain" in statuses:
         return "uncertain"
     return "veg"
+
+
+# ---------------------------------------------------------------------------
+# Jain diet: lacto-vegetarian plus no honey, alcohol, fungi, figs or anything
+# that grows underground (onion, garlic, potato, carrot, radish, ...).
+# Sources: Young Jains of America dietary guidance; jainknowledge.com "Jain
+# foods list"; thejainreligion.in "Jain food list". Items whose avoidance
+# varies between households are reported as "uncertain".
+# ---------------------------------------------------------------------------
+
+JainStatus = Literal["not_jain", "uncertain", "jain"]
+
+NOT_JAIN_EN: tuple[tuple[str, str], ...] = (
+    (r"\b(onions?|shallots?|scallions?|spring onions?|green onions?|leeks?|chives?|garlic|alliums?)\b", "onion/garlic"),
+    (r"\b(potato(es)?|sweet potato(es)?)\b", "potato"),
+    (r"\bcarrots?\b", "carrot"),
+    (r"\bbeet(root)?s?\b(?! sugar)", "beetroot"),
+    (r"\b(radish(es)?|daikon|turnips?|parsnips?|rutabagas?|swedes?|celeriac|salsify|horseradish|wasabi)\b", "root vegetable"),
+    (r"\b(yams?|taro|arrowroot|konjac|jicama|lotus roots?|burdock|ginseng|liquorice|licorice|galangal)\b", "root/tuber"),
+    (r"\b(mushrooms?|shiitake|porcini|enoki|portobello|champignons?|fung(us|i)|truffle oil)\b", "mushroom/fungus"),
+    (r"\b(honey|mead)\b", "honey"),
+    (r"\b(alcohol|ethanol|ethyl alcohol|wine(?! vinegar)|beer|rum|brandy|whisk(e)?y|vodka|liqueur|sake|mirin)\b", "alcohol"),
+    (r"\b(figs?|anjeer)\b", "fig"),
+)
+
+JAIN_UNCERTAIN_EN: tuple[tuple[str, str], ...] = (
+    (r"\b(yeast|leaven(ing)?)\b", "yeast (many Jains avoid)"),
+    (r"\bvinegar\b", "vinegar (fermented; varies)"),
+    (r"\b(fermented|soya? sauce|miso|tempeh|natto|kimchi|kombucha|kefir|sourdough)\b", "fermented (varies)"),
+    (r"\bgingers?\b", "ginger (fresh avoided; dried varies)"),
+    (r"\b(turmeric|curcumin)\b", "turmeric (varies)"),
+    (r"\b(tapioca|sago|cassava|manioc|sabudana)\b", "tapioca/cassava root starch (varies)"),
+    (r"\b(eggplants?|brinjals?|aubergines?)\b", "eggplant (multi-seeded; some avoid)"),
+    (r"\b(asafoetida|asafetida|hing)\b", "asafoetida (some avoid)"),
+    (r"\b(inulin|chicory)\b", "chicory root fibre (varies)"),
+    (r"\bsprout(s|ed)?\b", "sprouts (varies)"),
+)
+
+NOT_JAIN_VI: tuple[tuple[str, str], ...] = (
+    (r"\b(hành|hẹ|tỏi|boa rô|kiệu)\b", "onion/garlic (hành/tỏi)"),
+    (r"\bkhoai(?! mì)\b", "potato/tuber (khoai)"),
+    (r"\bcà rốt\b", "carrot (cà rốt)"),
+    (r"\bcủ\b", "root/tuber (củ)"),
+    (r"\b(riềng|sâm|cam thảo)\b", "root (riềng/sâm/cam thảo)"),
+    (r"\bnấm\b", "mushroom (nấm)"),
+    (r"\bmật ong\b", "honey (mật ong)"),
+    (r"\b(rượu|bia|cồn)\b", "alcohol (rượu/bia/cồn)"),
+    (r"\b(quả sung|trái sung)\b", "fig (sung)"),
+)
+
+JAIN_UNCERTAIN_VI: tuple[tuple[str, str], ...] = (
+    (r"\bmen\b", "yeast (men; many avoid)"),
+    (r"\bgiấm\b", "vinegar (giấm; varies)"),
+    (r"\b(lên men|nước tương|xì dầu|tương|chao|kim chi)\b", "fermented (varies)"),
+    (r"\bgừng\b", "ginger (gừng; varies)"),
+    (r"\bnghệ\b", "turmeric (nghệ; varies)"),
+    (r"\b(bột sắn|tinh bột sắn|bột năng|sắn|khoai mì|bột báng)\b", "tapioca/cassava (varies)"),
+    (r"\bcà tím\b", "eggplant (cà tím; some avoid)"),
+)
+
+_NOT_JAIN_EN = _compile(NOT_JAIN_EN)
+_JAIN_UNCERTAIN_EN = _compile(JAIN_UNCERTAIN_EN)
+_NOT_JAIN_VI = _compile(NOT_JAIN_VI)
+_JAIN_UNCERTAIN_VI = _compile(JAIN_UNCERTAIN_VI)
+
+
+@dataclass(frozen=True)
+class JainCheck:
+    status: JainStatus
+    matches: tuple[str, ...]
+
+    @property
+    def label(self) -> str:
+        return {"not_jain": "Not Jain", "uncertain": "Uncertain", "jain": "Jain-friendly"}[self.status]
+
+
+def classify_jain(original: str, english: str | None, veg: DietCheck) -> JainCheck:
+    """Classify one ingredient for the Jain diet, building on its vegetarian check."""
+    if veg.status == "non_veg":
+        return JainCheck("not_jain", ("non-vegetarian",))
+    texts = [original] + ([english] if english else [])
+    folded = " | ".join(fold_text(t) for t in texts)
+    vi = " | ".join(_vi_text(t) for t in texts)
+
+    not_jain = _find(folded, vi, _NOT_JAIN_EN, _NOT_JAIN_VI)
+    if not_jain:
+        return JainCheck("not_jain", tuple(not_jain))
+    uncertain = _find(folded, vi, _JAIN_UNCERTAIN_EN, _JAIN_UNCERTAIN_VI)
+    if veg.status == "uncertain":
+        uncertain = list(veg.matches) + uncertain
+    if uncertain:
+        return JainCheck("uncertain", tuple(uncertain))
+    return JainCheck("jain", ())
+
+
+def classify_jain_all(
+    originals: Sequence[str], english: Sequence[str] | None, veg_checks: Sequence[DietCheck]
+) -> list[JainCheck]:
+    english = english if english and len(english) == len(originals) else [None] * len(originals)
+    return [classify_jain(o, e, v) for o, e, v in zip(originals, english, veg_checks)]
+
+
+def overall_jain(checks: Iterable[JainCheck]) -> JainStatus:
+    statuses = {c.status for c in checks}
+    if "not_jain" in statuses:
+        return "not_jain"
+    if "uncertain" in statuses:
+        return "uncertain"
+    return "jain"

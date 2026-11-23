@@ -1,8 +1,19 @@
-from diet import classify_ingredient, classify_ingredients, overall_status
+from diet import (
+    classify_ingredient,
+    classify_ingredients,
+    classify_jain,
+    classify_jain_all,
+    overall_jain,
+    overall_status,
+)
 
 
 def statuses(*items):
     return [classify_ingredient(i).status for i in items]
+
+
+def jain(item, english=None):
+    return classify_jain(item, english, classify_ingredient(item, english))
 
 
 def test_egg_and_egg_derivatives_are_non_veg():
@@ -77,3 +88,58 @@ def test_overall_status_precedence():
 def test_classify_ingredients_ignores_mismatched_translation_length():
     checks = classify_ingredients(["trứng"], ["a", "b"])
     assert checks[0].status == "non_veg"
+
+
+def test_oyster_mushroom_is_vegetarian_but_not_jain():
+    veg = classify_ingredient("oyster mushroom")
+    assert veg.status == "veg"
+    assert jain("oyster mushroom").status == "not_jain"
+
+
+def test_jain_root_vegetables_honey_alcohol_fungi_fig():
+    for item in ("onion powder", "garlic", "potato starch", "carrot", "radish", "beetroot red", "honey", "mushroom", "fig paste", "rum flavouring"):
+        assert jain(item).status == "not_jain", item
+
+
+def test_jain_false_positive_guards():
+    for item in ("beet sugar", "wine vinegar", "sugar", "wheat flour", "milk powder"):
+        assert jain(item).status != "not_jain", item
+    assert jain("wine vinegar").status == "uncertain"
+    assert jain("bổ sung vitamin").status == "jain"  # "sung" alone is not fig
+
+
+def test_jain_uncertain_items():
+    for item in ("yeast extract", "vinegar", "soy sauce", "ginger", "tapioca starch", "eggplant"):
+        assert jain(item).status == "uncertain", item
+
+
+def test_jain_vietnamese_terms():
+    for item in ("hành tím", "tỏi", "khoai tây", "củ cải", "nấm", "mật ong", "rượu"):
+        assert jain(item).status == "not_jain", item
+    assert jain("men").status == "uncertain"
+    assert jain("khoai mì").status == "uncertain"
+
+
+def test_jain_uses_translation_too():
+    assert jain("hanh", "onion").status == "not_jain"
+
+
+def test_non_veg_is_automatically_not_jain():
+    check = jain("trứng")
+    assert check.status == "not_jain"
+    assert check.matches == ("non-vegetarian",)
+
+
+def test_veg_uncertain_propagates_to_jain_uncertain():
+    assert jain("glycerin").status == "uncertain"
+
+
+def test_overall_jain():
+    items = ["sugar", "onion", "salt"]
+    veg = classify_ingredients(items)
+    assert overall_status(veg) == "veg"
+    assert overall_jain(classify_jain_all(items, None, veg)) == "not_jain"
+    items = ["sugar", "yeast", "salt"]
+    assert overall_jain(classify_jain_all(items, None, classify_ingredients(items))) == "uncertain"
+    items = ["sugar", "salt", "milk"]
+    assert overall_jain(classify_jain_all(items, None, classify_ingredients(items))) == "jain"
