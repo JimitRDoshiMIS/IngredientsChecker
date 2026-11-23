@@ -25,6 +25,14 @@ install needed.
   MyMemory if Google is unavailable/blocked). Items are sent together so the
   translator has context (`đường` → "sugar", not "road"). English is shown in
   bold with the original beside it; the `.csv` contains both columns
+- **Vegetarian check**: every ingredient is classified 🟢 vegetarian /
+  🟠 uncertain / 🔴 non-vegetarian using English *and* Vietnamese term lists
+  (checked on both the original text and the translation). **Egg and egg
+  derivatives count as non-vegetarian.** A green banner means all ingredients
+  are vegetarian; a red banner lists the offending ingredients. Additives that
+  are only *sometimes* animal-derived (E471, glycerin, rennet, …) are amber so
+  the red verdict stays reliable. The `.csv` includes `diet` and `flagged_terms`
+  columns
 - Detected text regions drawn on the image
 - Full text assembled in reading order, with one-tap copy and `.txt` download
 - Manual 0/90/180/270° rotation plus optional auto-rotation detection
@@ -112,10 +120,18 @@ there; the **Auto** translation setting falls back to MyMemory automatically.
 | `app.py` | Streamlit UI (camera / upload, settings, ingredient list, full text) |
 | `ocr.py` | OCR helpers: label enhancement, EasyOCR wrapper, reading-order text assembly, ingredient parser, language validation |
 | `translate.py` | Ingredient translation to English via `deep-translator` (Google → MyMemory fallback, context-preserving chunking) |
+| `diet.py` | Vegetarian / non-vegetarian classifier (EN + VI term lists, egg = non-veg, uncertain additives) |
 | `.streamlit/config.toml` | Server binds to `0.0.0.0` so phones can connect; theme |
 | `.streamlit/secrets.example.toml` | Template for the optional `APP_PASSWORD` login |
 | `tests/test_ocr.py` | Unit tests for the pure OCR helpers |
 | `tests/test_translate.py` | Unit tests for translation chunking and backend fallback (no network) |
+| `tests/test_diet.py` | Unit tests for the vegetarian classifier (egg, accent-sensitive Vietnamese, E-numbers, false-positive guards) |
+
+> **Disclaimer:** the vegetarian check is keyword-based and only as good as the
+> OCR, the translation and the term lists in `diet.py`. Treat a green result as
+> "nothing suspicious found", not as certification — always double-check the
+> physical label for allergies or strict dietary needs. Add terms to the lists
+> in `diet.py` to extend coverage.
 
 ## Notes on translation
 

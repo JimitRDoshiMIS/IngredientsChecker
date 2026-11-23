@@ -12,6 +12,7 @@ import streamlit as st
 from PIL import Image, UnidentifiedImageError
 from streamlit.errors import StreamlitSecretNotFoundError
 
+from diet import classify_ingredients, overall_status
 from ocr import (
     DEFAULT_LANGUAGES,
     SUPPORTED_LANGUAGES,
@@ -270,21 +271,44 @@ if ingredients:
     elif translate_on:
         st.caption("Only English is selected, so there's nothing to translate.")
 
+    checks = classify_ingredients(ingredients, english)
+    verdict = overall_status(checks)
+    flagged = [(orig, en, c) for orig, en, c in zip(ingredients, english or ingredients, checks) if c.status != "veg"]
+
+    if verdict == "non_veg":
+        names = ", ".join(f"**{en or orig}**" for orig, en, c in flagged if c.status == "non_veg")
+        st.error(f"🔴 **NON-VEGETARIAN** — contains: {names}")
+    elif verdict == "uncertain":
+        names = ", ".join(f"**{en or orig}**" for orig, en, _ in flagged)
+        st.warning(f"🟠 **Probably vegetarian** — but these additives can be animal-derived: {names}")
+    else:
+        st.success("🟢 **100% VEGETARIAN** — no meat, fish, seafood or egg ingredients found")
+
+    def item_line(i: int, orig: str, en: str | None, check) -> str:
+        main = f"**{en}** <span style=\"color:gray\">· {orig}</span>" if en else orig
+        note = f" <span style=\"color:#c62828\">({', '.join(check.matches)})</span>" if check.matches else ""
+        return f"{i}. {check.emoji} {main}{note}"
+
+    st.markdown(
+        "\n".join(
+            item_line(i, orig, en, check)
+            for i, (orig, en, check) in enumerate(zip(ingredients, english or [None] * len(ingredients), checks), 1)
+        ),
+        unsafe_allow_html=True,
+    )
+    st.caption("🟢 vegetarian · 🟠 uncertain (additive that may be animal-derived) · 🔴 non-vegetarian (egg counts as non-veg)")
+
     if english:
-        st.markdown(
-            "\n".join(
-                f'{i}. **{en}** <span style="color:gray">· {orig}</span>'
-                for i, (orig, en) in enumerate(zip(ingredients, english), start=1)
-            ),
-            unsafe_allow_html=True,
-        )
         st.code("\n".join(english), language=None)
-        csv_data = "ingredient_english,ingredient_original\n" + "\n".join(
-            f"{csv_escape(en)},{csv_escape(orig)}" for orig, en in zip(ingredients, english)
+        csv_data = "ingredient_english,ingredient_original,diet,flagged_terms\n" + "\n".join(
+            f"{csv_escape(en)},{csv_escape(orig)},{check.label},{csv_escape('; '.join(check.matches))}"
+            for orig, en, check in zip(ingredients, english, checks)
         )
     else:
-        st.markdown("\n".join(f"{i}. {item}" for i, item in enumerate(ingredients, start=1)))
-        csv_data = "ingredient\n" + "\n".join(csv_escape(item) for item in ingredients)
+        csv_data = "ingredient,diet,flagged_terms\n" + "\n".join(
+            f"{csv_escape(item)},{check.label},{csv_escape('; '.join(check.matches))}"
+            for item, check in zip(ingredients, checks)
+        )
 
     st.download_button(
         "⬇️ Download ingredients (.csv)",
